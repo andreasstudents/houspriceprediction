@@ -112,7 +112,7 @@ house-price-prediction/
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/FjrREPO/house-price-prediction.git
+git clone 
 cd house-price-prediction
 
 # 2. Buat dan aktifkan virtual environment
@@ -252,7 +252,7 @@ Halaman prediksi memuat `optimized_rf_model.pkl` + `feature_scaler.pkl` (dengan 
 
 ## 📞 Kontak
 
-👨‍💻 **Developer**: [Fajar Jati Nugroho](https://github.com/FjrREPO)
+👨‍💻 **Developer**: 
 
 🐛 **Issues**: [GitHub Issues](https://github.com/FjrREPO/house-price-prediction/issues)
 
