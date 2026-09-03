@@ -254,7 +254,7 @@ Halaman prediksi memuat `optimized_rf_model.pkl` + `feature_scaler.pkl` (dengan 
 
 👨‍💻 **Developer**: 
 
-🐛 **Issues**: [GitHub Issues](https://github.com/FjrREPO/house-price-prediction/issues)
+🐛 **Issues**: 
 
 ---
 
