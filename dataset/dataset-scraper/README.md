@@ -107,11 +107,6 @@ dataset-scraper/
 
 ---
 
-## 📬 Kontak
-
-Dikembangkan oleh [Fajar Jati Nugroho](https://github.com/FjrREPO).  
-Feel free to open an issue or pull request!
-
 ---
 
 ## 📜 Lisensi
