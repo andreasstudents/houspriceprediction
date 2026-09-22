@@ -1,3 +1,4 @@
+import argparse
 import csv
 import os
 import random
@@ -10,9 +11,12 @@ from colorama import Fore, Style, init
 from urllib.error import URLError, HTTPError
 from urllib.request import urlopen as uReq, Request
 
+from r123_parser import LISTING_CARD_SELECTOR, parse_card
+
 init(autoreset=True)
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
+BASE_URL = "https://www.rumah123.com/jual/jawa-tengah/rumah/?page={page}"
 
 
 def load_user_agents(filepath):
@@ -39,7 +43,7 @@ def get_with_random_ua(url, user_agents, max_retries=5):
                 wait = (1.2**retry) + random.uniform(0, 1)
                 print(
                     Fore.MAGENTA
-                    + f"\u23f3 Connection issue or rate limited. Retrying in {wait:.2f}s... ({retry + 1}/{max_retries})"
+                    + f"⏳ Connection issue or rate limited. Retrying in {wait:.2f}s... ({retry + 1}/{max_retries})"
                 )
                 time.sleep(wait)
                 retry += 1
@@ -50,91 +54,18 @@ def get_with_random_ua(url, user_agents, max_retries=5):
     return None
 
 
-class HouseData:
-    def __init__(
-        self,
-        title,
-        price,
-        bedroom,
-        bathroom,
-        carport,
-        lt,
-        lb,
-        badges,
-        agent,
-        updated,
-        location,
-        link,
-        description,
-    ):
-        self.title = title
-        self.price = price
-        self.bedroom = bedroom
-        self.bathroom = bathroom
-        self.carport = carport
-        self.lt = lt
-        self.lb = lb
-        self.badges = badges
-        self.agent = agent
-        self.updated = updated
-        self.location = location
-        self.link = link
-        self.description = description
-
-    def printObject(self):
-        print(
-            f"""
-                Title: {self.title}
-                Price: {self.price}
-                Bedroom: {self.bedroom}
-                Bathroom: {self.bathroom}
-                Carport: {self.carport}
-                LT: {self.lt}
-                LB: {self.lb}
-                Badges: {self.badges}
-                Agent: {self.agent}
-                Updated: {self.updated}
-                Location: {self.location}
-                Link: {self.link}
-                Description: {self.description}
-            """
-        )
-
-
 def scrapeweb(start_page, end_page):
+    """Fetch halaman SRP Jawa Tengah dan parse setiap kartu listing."""
     listOfHouse = []
     ua_path = os.path.join(current_dir, "ua.txt")
     user_agents = load_user_agents(ua_path)
 
     for page in range(start_page, end_page + 1):
         try:
-            base_url_rumah123 = f"https://www.rumah123.com/jual/jawa-tengah/rumah/?page={page}"
+            base_url_rumah123 = BASE_URL.format(page=page)
             time.sleep(random.uniform(1.0, 3.0))
             print(Fore.CYAN + f"\n\U0001f680 Scraping page {page}: {base_url_rumah123}")
             html_page = get_with_random_ua(base_url_rumah123, user_agents)
-
-            # Debugging: Check if html_page is None
-            html_text = html_page.decode("utf-8", errors="ignore")
-            for keyword in [
-    '"propertyType"',
-    '"priceType"',
-    '"bedrooms"',
-    '"landSize"',
-    '"buildingSize"',
-    '"title"',
-]:
-                print(keyword, "=>", html_text.find(keyword))
-
-            # Debugging: Save the HTML page to a file for inspection
-            with open("debug.html", "wb") as f:
-                f.write(html_page)
-            soup_page = soup(html_page, "html.parser")
-
-            # Debugging: Print the size of the HTML page
-            print("HTML size:", len(html_page))
-
-            
-            
 
             if html_page is None:
                 print(
@@ -142,9 +73,11 @@ def scrapeweb(start_page, end_page):
                     + f"⚠️ Skipping page {page} due to repeated failures."
                 )
                 continue
+
             soup_page = soup(html_page, "html.parser")
 
-            property_list = soup_page.find_all("div", class_="card-featured")
+            # Kartu listing versi baru: article[data-name="ldp-listing-card"]
+            property_list = soup_page.find_all("article", attrs=LISTING_CARD_SELECTOR)
 
             if not property_list:
                 print(Fore.YELLOW + "⚠️ No more properties found. Stopping.")
@@ -154,106 +87,7 @@ def scrapeweb(start_page, end_page):
                 property_list, desc=f"🔍 Parsing properties on page {page}"
             ):
                 try:
-                    title_elem = prop.find("h2")
-                    title = title_elem.get_text(strip=True) if title_elem else "N/A"
-
-                    price_elem = prop.find(
-                        "div", class_="card-featured__middle-section__price"
-                    )
-                    price = price_elem.get_text(strip=True) if price_elem else "N/A"
-
-                    bedroom = bathroom = carport = "N/A"
-                    attribute_section = prop.find(
-                        "div", class_="card-featured__middle-section__attribute"
-                    )
-                    if attribute_section:
-                        attributes = attribute_section.find_all(
-                            "div", class_="ui-molecules-list__item"
-                        )
-                        for idx, attr in enumerate(attributes):
-                            text = attr.get_text(strip=True)
-                            if idx == 0:
-                                bedroom = text
-                            elif idx == 1:
-                                bathroom = text
-                            elif idx == 2:
-                                carport = text
-
-                    lt = lb = "N/A"
-                    attribute_infos = prop.find_all("div", class_="attribute-info")
-                    if len(attribute_infos) >= 1:
-                        lt_span = attribute_infos[0].find("span")
-                        if lt_span:
-                            lt = lt_span.get_text(strip=True)
-                    if len(attribute_infos) >= 2:
-                        lb_span = attribute_infos[1].find("span")
-                        if lb_span:
-                            lb = lb_span.get_text(strip=True)
-
-                    badges = []
-                    badge_elems = prop.find_all("a", class_="quick-label-badge")
-                    for badge in badge_elems:
-                        span = badge.find("span")
-                        if span:
-                            badge_text = span.get_text(strip=True)
-                            if badge_text and badge_text not in badges:
-                                badges.append(badge_text)
-
-                    header_badge_section = prop.find(
-                        "div", class_="card-featured__middle-section__header-badge"
-                    )
-                    if header_badge_section:
-                        header_badges = header_badge_section.find_all(
-                            "div", attrs={"data-test-id": "badge-depth"}
-                        )
-                        for badge in header_badges:
-                            badge_text = badge.get_text(strip=True)
-                            if badge_text and badge_text not in badges:
-                                badges.append(badge_text)
-
-                    agent_elem = prop.find("p", class_="name")
-                    agent = agent_elem.get_text(strip=True) if agent_elem else "N/A"
-
-                    updated_elem = prop.find(
-                        "p", string=lambda text: text and "Diperbarui" in text
-                    )
-                    updated = (
-                        updated_elem.get_text(strip=True) if updated_elem else "N/A"
-                    )
-
-                    location = "N/A"
-                    h2_tag = prop.find("h2")
-                    if h2_tag:
-                        next_span = h2_tag.find_next("span")
-                        if next_span:
-                            location = next_span.get_text(strip=True)
-
-                    link = "N/A"
-                    link_elem = prop.find(
-                        "a", href=lambda href: href and "/properti/" in href
-                    )
-                    if link_elem and "href" in link_elem.attrs:
-                        link = link_elem["href"]
-
-                    desc_elem = prop.find("p", string=lambda s: s and len(s) > 10)
-                    description = desc_elem.get_text(strip=True) if desc_elem else "N/A"
-
-                    house = HouseData(
-                        title,
-                        price,
-                        bedroom,
-                        bathroom,
-                        carport,
-                        lt,
-                        lb,
-                        badges,
-                        agent,
-                        updated,
-                        location,
-                        link,
-                        description,
-                    )
-                    listOfHouse.append(house)
+                    listOfHouse.append(parse_card(prop))
                 except Exception as e:
                     print(Fore.RED + f"❌ Error parsing property: {str(e)}")
                     continue
@@ -264,6 +98,24 @@ def scrapeweb(start_page, end_page):
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Scraper listing rumah123.com Jawa Tengah (struktur Next.js)"
+    )
+    parser.add_argument("--start-page", type=int, default=1)
+    parser.add_argument(
+        "--end-page",
+        type=int,
+        default=2,
+        help="Halaman terakhir. Untuk scrape sampai habis, pakai angka besar (mis. 9999) — "
+        "loop berhenti sendiri saat halaman kosong.",
+    )
+    parser.add_argument(
+        "--output",
+        default=os.path.join(current_dir, "../houses_jawa_tengah.csv"),
+        help="Path CSV output (default terpisah dari houses.csv training Yogyakarta)",
+    )
+    args = parser.parse_args()
+
     print(
         Fore.CYAN
         + Style.BRIGHT
@@ -274,12 +126,11 @@ def main():
 """
     )
 
-    listOfHouse = []
-    listOfHouse = scrapeweb(1, 2)
+    listOfHouse = scrapeweb(args.start_page, args.end_page)
 
     print(Fore.GREEN + f"\n✅ Found {len(listOfHouse)} properties in total!")
 
-    csv_path = os.path.join(current_dir, "../houses.csv")
+    csv_path = args.output
     csv_headers = [
         "title",
         "price",
@@ -293,34 +144,20 @@ def main():
         "updated",
         "location",
         "link",
+        "description",
     ]
 
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=csv_headers, quoting=csv.QUOTE_ALL)
         writer.writeheader()
-        for house in listOfHouse:
-            writer.writerow(
-                {
-                    "title": f"{house.title}",
-                    "price": f"{house.price}",
-                    "bedroom": f"{house.bedroom}",
-                    "bathroom": f'{house.bathroom}"',
-                    "carport": f'"{house.carport}"',
-                    "LT": f"{house.lt}",
-                    "LB": f"{house.lb}",
-                    "badges": f'"{", ".join(house.badges)}',
-                    "agent": f"{house.agent}",
-                    "updated": f"{house.updated}",
-                    "location": f"{house.location}",
-                    "link": f"{house.link}",
-                }
-            )
+        writer.writerows(listOfHouse)
 
     print(Fore.BLUE + f"💾 Saved {len(listOfHouse)} entries to {csv_path}")
 
     if listOfHouse:
         print(Fore.LIGHTYELLOW_EX + "\n🎯 Sample property:\n")
-        listOfHouse[0].printObject()
+        for k, v in listOfHouse[0].items():
+            print(f"  {k}: {v}")
 
 
 if __name__ == "__main__":
