@@ -108,10 +108,34 @@ def scrapeweb(start_page, end_page):
 
     for page in range(start_page, end_page + 1):
         try:
-            base_url_rumah123 = f"https://www.rumah123.com/jual/daerah-istimewa-yogyakarta/rumah/?page={page}"
+            base_url_rumah123 = f"https://www.rumah123.com/jual/jawa-tengah/rumah/?page={page}"
             time.sleep(random.uniform(1.0, 3.0))
             print(Fore.CYAN + f"\n\U0001f680 Scraping page {page}: {base_url_rumah123}")
             html_page = get_with_random_ua(base_url_rumah123, user_agents)
+
+            # Debugging: Check if html_page is None
+            html_text = html_page.decode("utf-8", errors="ignore")
+            for keyword in [
+    '"propertyType"',
+    '"priceType"',
+    '"bedrooms"',
+    '"landSize"',
+    '"buildingSize"',
+    '"title"',
+]:
+                print(keyword, "=>", html_text.find(keyword))
+
+            # Debugging: Save the HTML page to a file for inspection
+            with open("debug.html", "wb") as f:
+                f.write(html_page)
+            soup_page = soup(html_page, "html.parser")
+
+            # Debugging: Print the size of the HTML page
+            print("HTML size:", len(html_page))
+
+            
+            
+
             if html_page is None:
                 print(
                     Fore.LIGHTRED_EX
@@ -251,7 +275,7 @@ def main():
     )
 
     listOfHouse = []
-    scrapeweb(listOfHouse)
+    listOfHouse = scrapeweb(1, 2)
 
     print(Fore.GREEN + f"\n✅ Found {len(listOfHouse)} properties in total!")
 
